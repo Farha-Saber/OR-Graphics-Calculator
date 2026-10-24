@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>حاسبة ورسومات بحوث العمليات المباشرة</title>
+    <!-- مكتبة Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 25px; }
+        .header h1 { color: #1a365d; margin-bottom: 5px; }
+        .nav-tabs { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { padding: 12px 24px; background-color: #e2e8f0; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .tab-btn.active { background-color: #2b6cb0; color: white; }
+        .tab-content { display: none; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); max-width: 900px; margin: auto; }
+        .tab-content.active { display: block; }
+        .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .input-group { display: flex; flex-direction: column; }
+        .input-group label { font-weight: 600; margin-bottom: 5px; font-size: 14px; }
+        .input-group input { padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; }
+        button.calc-btn { width: 100%; padding: 12px; background-color: #2b6cb0; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button.calc-btn:hover { background-color: #1a365d; }
+        .results-box { background-color: #ebf8ff; border-right: 4px solid #3182ce; padding: 15px; border-radius: 6px; margin: 20px 0; font-size: 15px; line-height: 1.6; }
+        .chart-container { position: relative; height: 420px; margin-top: 20px; }
+        .constraint-row { display: grid; grid-template-columns: repeat(4, minmax(80px, 1fr)) auto; gap: 8px; margin-bottom: 10px; align-items: center; }
+        .constraint-row input, .constraint-row select, .input-group select { padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; background: white; }
+        .secondary-btn { padding: 10px 14px; border: 0; border-radius: 6px; background: #e2e8f0; cursor: pointer; font-weight: bold; }
+        .constraint-row .remove-btn { background: #fed7d7; }
+        .hint { color: #4a5568; font-size: 14px; }
+        @media (max-width: 600px) { body { padding: 10px; } .tab-content { padding: 16px; } .nav-tabs { flex-wrap: wrap; } .constraint-row { grid-template-columns: repeat(2, minmax(80px, 1fr)); } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>حاسبة ورسومات بحوث العمليات العامة</h1>
+    <p>تعمل مع أي أرقام ومعادلات تفترضينها في المسائل</p>
+</div>
+
+<!-- شريط التنقل بين الرسومات -->
+<div class="nav-tabs">
+    <button class="tab-btn active" type="button" data-tab="breakeven">الفصل الأول: نقطة التعادل</button>
+    <button class="tab-btn" type="button" data-tab="lp">الفصلان الثاني والثالث: البرمجة الخطية والحساسية</button>
+</div>
+
+<section id="breakeven" class="tab-content active">
+    <h3>الفصل الأول: نقطة التعادل وتحليل الحساسية</h3>
+    <div class="input-grid">
+        <div class="input-group">
+            <label for="be-mode">نوع الرسم</label>
+            <select id="be-mode">
+                <option value="standard">Standard Break-Even Chart</option>
+                <option value="price">تأثير زيادة سعر البيع</option>
+                <option value="variable">تأثير زيادة التكلفة المتغيرة</option>
+                <option value="fixed">تأثير زيادة التكاليف الثابتة</option>
+            </select>
+        </div>
+        <div class="input-group"><label for="be-cf">التكاليف الثابتة (cf)</label><input type="number" id="be-cf" value="8000"></div>
+        <div class="input-group"><label for="be-cv">التكلفة المتغيرة للوحدة (cv)</label><input type="number" id="be-cv" value="65"></div>
+        <div class="input-group"><label for="be-p">سعر بيع الوحدة (p)</label><input type="number" id="be-p" value="180"></div>
+        <div class="input-group" id="be-change-group" hidden>
+            <label id="be-change-label" for="be-change">قيمة السيناريو الجديد</label>
+            <input type="number" id="be-change" value="200">
+        </div>
+    </div>
+    <button class="calc-btn" id="be-draw" type="button">ارسم واحسب</button>
+    <div class="results-box" id="be-results" aria-live="polite">أدخلي بيانات المسألة ثم اضغطي «ارسم واحسب».</div>
+    <div class="chart-container"><canvas id="beChart"></canvas></div>
+</section>
+
+<section id="lp" class="tab-content">
+    <h3> الفصلان الثاني والثالث: الرسوم البيانية للبرمجة الخطيةوالحل البياني</h3>
+    <p class="hint">أدخلي معاملات كل قيد والطرف الأيمن، واختاري اتجاه القيد. نفترض عدم سلبية المتغيرين: x1 ≥ 0 وx2 ≥ 0.</p>
+    <div class="input-grid">
+        <div class="input-group">
+            <label for="lp-mode">نوع الرسم</label>
+            <select id="lp-mode">
+                <option value="constraints">القيود الفردية (Individual Constraints)</option>
+                <option value="feasible">منطقة الحلول الممكنة (Feasible Region)</option>
+                <option value="objective">خطوط دالة الهدف (Iso-Profit / Iso-Cost)</option>
+                <option value="optimal">نقاط الزوايا والحل الأمثل</option>
+                <option value="minimization">نموذج تقليل التكاليف ومنطقته المفتوحة</option>
+                <option value="multiple">حلول مثلى متعددة</option>
+                <option value="infeasible">مسألة غير ممكنة (Infeasible)</option>
+                <option value="unbounded">مسألة غير محدودة (Unbounded)</option>
+                <option value="slack">متغيرات الراكد (Slack)</option>
+                <option value="surplus">متغيرات الفائض (Surplus)</option>
+                <option value="optimality">نطاق المثالية وتغير معاملات الهدف</option>
+                <option value="rhs">تغير الطرف الأيمن RHS وسعر الظل</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label for="lp-direction">الهدف</label>
+            <select id="lp-direction"><option value="max">تعظيم (Maximize)</option><option value="min">تقليل (Minimize)</option></select>
+        </div>
+        <div class="input-group"><label for="lp-c1">معامل x1 في الهدف (c1)</label><input type="number" id="lp-c1" value="40"></div>
+        <div class="input-group"><label for="lp-c2">معامل x2 في الهدف (c2)</label><input type="number" id="lp-c2" value="50"></div>
+        <div class="input-group" id="rhs-change-group" hidden>
+            <label for="rhs-constraint">القيد المراد تغيير RHS له</label>
+            <select id="rhs-constraint"></select>
+        </div>
+        <div class="input-group" id="rhs-delta-group" hidden>
+            <label for="rhs-delta">مقدار تغير RHS (موجب للزيادة وسالب للنقصان)</label>
+            <input type="number" id="rhs-delta" value="10">
+        </div>
+    </div>
+    <h4>القيود: a·x1 + b·x2 (≤ أو ≥ أو =) الطرف الأيمن</h4>
+    <div id="constraints-list"></div>
+    <button class="secondary-btn" id="add-constraint" type="button">+ إضافة قيد</button>
+    <button class="calc-btn" id="lp-draw" type="button" style="margin-top:12px">ارسم الرسم المختار واحسب</button>
+    <div class="results-box" id="lp-results" aria-live="polite">أدخلي القيود ودالة الهدف ثم اضغطي «ارسم الرسم المختار واحسب».</div>
+    <div class="chart-container"><canvas id="lpChart"></canvas></div>
+</section>
+
+<script>
+    const charts = {};
+    const colors = ['#3182ce', '#dd6b20', '#38a169', '#805ad5', '#d53f8c', '#718096', '#319795', '#c05621'];
+    const byId = id => document.getElementById(id);
+    const number = id => Number(byId(id).value);
+    const finite = value => Number.isFinite(value);
+
+    document.querySelectorAll('.tab-btn').forEach(button => button.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(item => item.classList.toggle('active', item === button));
+        document.querySelectorAll('.tab-content').forEach(item => item.classList.toggle('active', item.id === button.dataset.tab));
+    }));
+
+    function setError(canvasId, resultId, message) {
+        byId(resultId).textContent = message;
+        if (charts[canvasId]) {
+            charts[canvasId].destroy();
+            delete charts[canvasId];
+        }
+    }
+
+    function drawScatter(canvasId, datasets, xMax, yMax, xTitle, yTitle) {
+        if (charts[canvasId]) charts[canvasId].destroy();
+        charts[canvasId] = new Chart(byId(canvasId).getContext('2d'), {
+            type: 'scatter',
+            data: { datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                parsing: false,
+                scales: {
+                    x: { type: 'linear', min: 0, max: xMax, title: { display: true, text: xTitle } },
+                    y: { type: 'linear', min: 0, max: yMax, title: { display: true, text: yTitle } }
+                }
+            }
+        });
+    }
+
+    function updateBreakEvenControls() {
+        const mode = byId('be-mode').value;
+        const group = byId('be-change-group');
+        group.hidden = mode === 'standard';
+        const labels = {
+            price: ['سعر البيع الجديد', '200'],
+            variable: ['التكلفة المتغيرة الجديدة', '75'],
+            fixed: ['التكاليف الثابتة الجديدة', '10000']
+        };
+        if (labels[mode]) {
+            byId('be-change-label').textContent = labels[mode][0];
+            byId('be-change').value = labels[mode][1];
+        }
+    }
+
+    function breakEvenPoint(cf, cv, price) {
+        if (cf < 0 || cv < 0 || price <= cv) return null;
+        return cf / (price - cv);
+    }
+
+    function drawBreakEven() {
+        const cf = number('be-cf'), cv = number('be-cv'), price = number('be-p');
+        const mode = byId('be-mode').value;
+        if (![cf, cv, price].every(finite) || cf < 0 || cv < 0 || price <= cv) {
+            setError('beChart', 'be-results', 'تحققي من إدخال أرقام صحيحة غير سالبة، وأن يكون سعر البيع أكبر من التكلفة المتغيرة.');
+            return;
+        }
+        const baseBreakEven = breakEvenPoint(cf, cv, price);
+        let scenario = null;
+        let scenarioLabel = '';
+        if (mode !== 'standard') {
+            const changed = number('be-change');
+            if (!finite(changed) || changed < 0) {
+                setError('beChart', 'be-results', 'أدخلي قيمة سيناريو جديدة صحيحة وغير سالبة.');
+                return;
+            }
+            const values = { cf, cv, price };
+            if (mode === 'price') { values.price = changed; scenarioLabel = 'بعد زيادة سعر البيع'; }
+            if (mode === 'variable') { values.cv = changed; scenarioLabel = 'بعد زيادة التكلفة المتغيرة'; }
+            if (mode === 'fixed') { values.cf = changed; scenarioLabel = 'بعد زيادة التكاليف الثابتة'; }
+            scenario = { ...values, breakEven: breakEvenPoint(values.cf, values.cv, values.price) };
+            if (scenario.breakEven === null) {
+                setError('beChart', 'be-results', 'السيناريو غير صالح: يجب أن يكون سعر البيع أكبر من التكلفة المتغيرة.');
+                return;
+            }
+        }
+        const maxVolume = Math.max(10, Math.ceil(Math.max(baseBreakEven, scenario ? scenario.breakEven : 0) * 1.6));
+        const volumes = Array.from({ length: 41 }, (_, index) => maxVolume * index / 40);
+        const datasets = [
+            { label: 'التكاليف الثابتة (FC)', data: volumes.map(v => ({ x: v, y: cf })), borderColor: '#718096', borderDash: [6, 4], showLine: true, pointRadius: 0 },
+            { label: 'التكلفة الكلية (TC)', data: volumes.map(v => ({ x: v, y: cf + v * cv })), borderColor: '#e53e3e', showLine: true, pointRadius: 0 },
+            { label: 'الإيراد الكلي (TR)', data: volumes.map(v => ({ x: v, y: v * price })), borderColor: '#38a169', showLine: true, pointRadius: 0 },
+            { label: 'نقطة التعادل', data: [{ x: baseBreakEven, y: baseBreakEven * price }], backgroundColor: '#1a202c', pointRadius: 6 }
+        ];
+        if (scenario) {
+            datasets.push(
+                { label: `${scenarioLabel}: TC`, data: volumes.map(v => ({ x: v, y: scenario.cf + v * scenario.cv })), borderColor: '#805ad5', borderDash: [5, 4], showLine: true, pointRadius: 0 },
+                { label: `${scenarioLabel}: TR`, data: volumes.map(v => ({ x: v, y: v * scenario.price })), borderColor: '#319795', borderDash: [5, 4], showLine: true, pointRadius: 0 },
+                { label: 'تعادل السيناريو', data: [{ x: scenario.breakEven, y: scenario.breakEven * scenario.price }], backgroundColor: '#d53f8c', pointRadius: 6 }
+            );
+        }
+        const maxMoney = Math.max(cf + maxVolume * cv, maxVolume * price, scenario ? scenario.cf + maxVolume * scenario.cv : 0, scenario ? maxVolume * scenario.price : 0) * 1.1;
+        drawScatter('beChart', datasets, maxVolume, Math.max(1, maxMoney), 'حجم المبيعات / Volume (v)', 'الإيراد والتكلفة / Dollars');
+        let summary = `حجم التعادل الأساسي: ${baseBreakEven.toFixed(2)} وحدة، والإيراد/التكلفة عنده: ${(baseBreakEven * price).toFixed(2)}.`;
+        if (scenario) summary += ` ${scenarioLabel}: حجم التعادل ${scenario.breakEven.toFixed(2)} وحدة.`;
+        summary += ' تقع الخسارة قبل نقطة التعادل والربح بعدها.';
+        byId('be-results').textContent = summary;
+    }
+
+    function addConstraint(a = 1, b = 2, rhs = 40, relation = '<=') {
+        const row = document.createElement('div');
+        row.className = 'constraint-row';
+        row.innerHTML = `<input type="number" step="any" aria-label="معامل x1" value="${a}"><input type="number" step="any" aria-label="معامل x2" value="${b}"><select aria-label="اتجاه القيد"><option value="<=">≤</option><option value=">=">≥</option><option value="=">=</option></select><input type="number" step="any" aria-label="الطرف الأيمن" value="${rhs}"><button type="button" class="secondary-btn remove-btn" aria-label="حذف القيد">حذف</button>`;
+        row.querySelector('select').value = relation;
+        byId('constraints-list').appendChild(row);
+        refreshRhsChoices();
+    }
+
+    function refreshRhsChoices() {
+        const select = byId('rhs-constraint');
+        const previous = select.value;
+        const count = byId('constraints-list').children.length;
+        select.replaceChildren();
+        for (let index = 0; index < count; index++) {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `القيد ${index + 1}`;
+            select.appendChild(option);
+        }
+        if (previous && Number(previous) < count) select.value = previous;
+    }
+
+    byId('constraints-list').addEventListener('click', event => {
+        if (event.target.classList.contains('remove-btn')) {
+            event.target.closest('.constraint-row').remove();
+            refreshRhsChoices();
+        }
+    });
+    byId('add-constraint').addEventListener('click', () => addConstraint(1, 1, 20));
+    byId('lp-mode').addEventListener('change', () => {
+        const mode = byId('lp-mode').value;
+        const rhsMode = mode === 'rhs';
+        byId('rhs-change-group').hidden = !rhsMode;
+        byId('rhs-delta-group').hidden = !rhsMode;
+        if (mode === 'minimization') byId('lp-direction').value = 'min';
+    });
+
+    function readConstraints() {
+        return Array.from(byId('constraints-list').children, row => {
+            const inputs = row.querySelectorAll('input');
+            return { a: Number(inputs[0].value), b: Number(inputs[1].value), relation: row.querySelector('select').value, rhs: Number(inputs[2].value) };
+        });
+    }
+
+    function insideConstraint(x, y, constraint, tolerance = 1e-7) {
+        const lhs = constraint.a * x + constraint.b * y;
+        if (constraint.relation === '<=') return lhs <= constraint.rhs + tolerance;
+        if (constraint.relation === '>=') return lhs >= constraint.rhs - tolerance;
+        return Math.abs(lhs - constraint.rhs) <= tolerance;
+    }
+
+    function clipPolygon(polygon, a, b, rhs) {
+        if (!polygon.length) return [];
+        const result = [];
+        for (let index = 0; index < polygon.length; index++) {
+            const current = polygon[index], next = polygon[(index + 1) % polygon.length];
+            const currentValue = a * current.x + b * current.y - rhs;
+            const nextValue = a * next.x + b * next.y - rhs;
+            const currentInside = currentValue <= 1e-7, nextInside = nextValue <= 1e-7;
+            if (currentInside) result.push(current);
+            if (currentInside !== nextInside) {
+                const ratio = currentValue / (currentValue - nextValue);
+                result.push({ x: current.x + ratio * (next.x - current.x), y: current.y + ratio * (next.y - current.y) });
+            }
+        }
+        return result;
+    }
+
+    function feasiblePolygon(constraints, xMax, yMax) {
+        let polygon = [{ x: 0, y: 0 }, { x: xMax, y: 0 }, { x: xMax, y: yMax }, { x: 0, y: yMax }];
+        constraints.forEach(constraint => {
+            if (constraint.relation === '<=' || constraint.relation === '=') polygon = clipPolygon(polygon, constraint.a, constraint.b, constraint.rhs);
+            if (constraint.relation === '>=' || constraint.relation === '=') polygon = clipPolygon(polygon, -constraint.a, -constraint.b, -constraint.rhs);
+        });
+        return polygon;
+    }
+
+    function boundaryPoints(a, b, rhs, xMax, yMax) {
+        const points = [];
+        const add = (x, y) => {
+            if (finite(x) && finite(y) && x >= -1e-7 && x <= xMax + 1e-7 && y >= -1e-7 && y <= yMax + 1e-7 && !points.some(point => Math.abs(point.x - x) < 1e-7 && Math.abs(point.y - y) < 1e-7)) {
+                points.push({ x: Math.max(0, x), y: Math.max(0, y) });
+            }
+        };
+        if (b !== 0) { add(0, rhs / b); add(xMax, (rhs - a * xMax) / b); }
+        if (a !== 0) { add(rhs / a, 0); add((rhs - b * yMax) / a, yMax); }
+        return points.sort((left, right) => left.x - right.x || left.y - right.y);
+    }
+
+    function intersection(first, second) {
+        const determinant = first.a * second.b - second.a * first.b;
+        if (Math.abs(determinant) < 1e-10) return null;
+        return { x: (first.rhs * second.b - second.rhs * first.b) / determinant, y: (first.a * second.rhs - second.a * first.rhs) / determinant };
+    }
+
+    function candidateVertices(constraints) {
+        const lines = [{ a: 1, b: 0, rhs: 0 }, { a: 0, b: 1, rhs: 0 }];
+        constraints.forEach(item => lines.push({ a: item.a, b: item.b, rhs: item.rhs }));
+        const points = [{ x: 0, y: 0 }];
+        for (let i = 0; i < lines.length; i++) {
+            for (let j = i + 1; j < lines.length; j++) {
+                const point = intersection(lines[i], lines[j]);
+                if (point && point.x >= -1e-7 && point.y >= -1e-7 && constraints.every(item => insideConstraint(point.x, point.y, item))) points.push({ x: Math.max(0, point.x), y: Math.max(0, point.y) });
+            }
+        }
+        return points.filter((point, index) => points.findIndex(other => Math.abs(other.x - point.x) < 1e-7 && Math.abs(other.y - point.y) < 1e-7) === index);
+    }
+
+    function objectiveLine(c1, c2, level, xMax, yMax) {
+        return boundaryPoints(c1, c2, level, xMax, yMax);
+    }
+
+    function drawLP() {
+        const mode = byId('lp-mode').value;
+        const direction = byId('lp-direction').value;
+        const c1 = number('lp-c1'), c2 = number('lp-c2');
+        const constraints = readConstraints();
+        if (!finite(c1) || !finite(c2) || constraints.length === 0 || constraints.some(item => ![item.a, item.b, item.rhs].every(finite) || (item.a === 0 && item.b === 0))) {
+            setError('lpChart', 'lp-results', 'أدخلي معاملات وطرفًا أيمن صالحًا لكل قيد، ولا تتركي القيد بمعاملين يساويان صفرًا.');
+            return;
+        }
+        const selectedRhsIndex = Number(byId('rhs-constraint').value);
+        if (mode === 'rhs') {
+            const delta = number('rhs-delta');
+            if (!finite(delta) || !constraints[selectedRhsIndex]) {
+                setError('lpChart', 'lp-results', 'اختاري قيدًا وأدخلي مقدارًا صالحًا لتغيير RHS.');
+                return;
+            }
+        }
+        const plottedConstraints = constraints.map(item => ({ ...item }));
+        if (mode === 'rhs') plottedConstraints[selectedRhsIndex].rhs += number('rhs-delta');
+        const axisMax = Math.max(10, ...plottedConstraints.map(item => Math.abs(item.rhs / (item.a || item.b || 1)) * 1.25));
+        const xMax = axisMax, yMax = axisMax;
+        const polygon = feasiblePolygon(plottedConstraints, xMax, yMax);
+        const points = candidateVertices(plottedConstraints);
+        const best = points.reduce((chosen, point) => {
+            const value = c1 * point.x + c2 * point.y;
+            if (!chosen) return { ...point, value };
+            return direction === 'max' ? (value > chosen.value ? { ...point, value } : chosen) : (value < chosen.value ? { ...point, value } : chosen);
+        }, null);
+        const datasets = [];
+        const shadeModes = ['feasible', 'optimal', 'minimization', 'multiple', 'slack', 'surplus', 'optimality', 'rhs', 'infeasible', 'unbounded'];
+        if (shadeModes.includes(mode) && polygon.length >= 3) {
+            datasets.push({ label: 'منطقة الحل الممكنة (داخل مجال الرسم)', data: [...polygon, polygon[0]], borderColor: '#3182ce', backgroundColor: 'rgba(49, 130, 206, 0.18)', fill: true, showLine: true, pointRadius: 0 });
+        }
+        constraints.forEach((constraint, index) => {
+            if (mode === 'rhs' && index === selectedRhsIndex) {
+                const original = boundaryPoints(constraint.a, constraint.b, constraint.rhs, xMax, yMax);
+                if (original.length > 1) datasets.push({ label: `القيد ${index + 1} قبل التغيير`, data: original, borderColor: colors[index % colors.length], borderDash: [6, 4], showLine: true, pointRadius: 0 });
+            }
+            const plotted = plottedConstraints[index];
+            const line = boundaryPoints(plotted.a, plotted.b, plotted.rhs, xMax, yMax);
+            if (line.length > 1) datasets.push({ label: `القيد ${index + 1}: ${constraint.a}x1 + ${constraint.b}x2 ${constraint.relation} ${plotted.rhs}`, data: line, borderColor: colors[index % colors.length], showLine: true, pointRadius: 0, borderWidth: 2 });
+        });
+        if (['objective', 'optimal', 'minimization', 'multiple', 'optimality', 'rhs'].includes(mode)) {
+            const levels = [0.35, 0.65, 0.95].map(fraction => fraction * (c1 * xMax + c2 * yMax));
+            levels.forEach((level, index) => {
+                const line = objectiveLine(c1, c2, level, xMax, yMax);
+                if (line.length > 1) datasets.push({ label: `دالة الهدف: ${c1}x1 + ${c2}x2 = ${level.toFixed(1)}`, data: line, borderColor: ['#805ad5', '#d53f8c', '#dd6b20'][index], borderDash: [4, 3], showLine: true, pointRadius: 0 });
+            });
+        }
+        if (mode === 'optimality' && constraints.length >= 2) {
+            constraints.slice(0, 2).forEach((item, index) => {
+                const line = objectiveLine(item.a, item.b, 0.65 * (item.a * xMax + item.b * yMax), xMax, yMax);
+                if (line.length > 1) datasets.push({ label: `ميل حدّي من القيد ${index + 1}`, data: line, borderColor: index ? '#319795' : '#718096', borderDash: [2, 5], showLine: true, pointRadius: 0 });
+            });
+        }
+        if (points.length && ['optimal', 'minimization', 'slack', 'surplus'].includes(mode)) {
+            datasets.push({ label: 'نقاط الزوايا الممكنة', data: points.map(point => ({ x: point.x, y: point.y })), backgroundColor: '#2b6cb0', pointRadius: 5 });
+        }
+        if (best && ['optimal', 'minimization', 'slack', 'surplus'].includes(mode)) {
+            datasets.push({ label: `الحل ${direction === 'max' ? 'الأكبر' : 'الأقل'}`, data: [{ x: best.x, y: best.y }], backgroundColor: '#e53e3e', pointRadius: 8 });
+        }
+        if (mode === 'multiple' && constraints.length) {
+            const parallel = constraints.find(item => Math.abs(c1 * item.b - c2 * item.a) < 1e-7);
+            if (parallel) {
+                const level = c1 * xMax * 0.5 + c2 * yMax * 0.5;
+                const line = objectiveLine(c1, c2, level, xMax, yMax);
+                if (line.length > 1) datasets.push({ label: 'خط هدف موازٍ لقيد (مثال حلول مثلى متعددة)', data: line, borderColor: '#d53f8c', borderWidth: 3, showLine: true, pointRadius: 0 });
+            }
+        }
+        drawScatter('lpChart', datasets, xMax, yMax, 'x1', 'x2');
+        let summary = polygon.length ? `منطقة الحل الممكن ظاهرة ضمن نطاق الرسم (${xMax.toFixed(1)} × ${yMax.toFixed(1)}). ` : 'لا توجد منطقة حلول ممكنة لهذه القيود في الربع الأول. ';
+        if (best && polygon.length) {
+            summary += `أفضل زاوية ممكنة محسوبة: (x1=${best.x.toFixed(2)}, x2=${best.y.toFixed(2)})، وقيمة الهدف ${best.value.toFixed(2)}. `;
+            if (mode === 'slack' || mode === 'surplus') {
+                const amounts = plottedConstraints.map((item, index) => {
+                    const amount = item.relation === '>=' ? best.x * item.a + best.y * item.b - item.rhs : item.rhs - best.x * item.a - best.y * item.b;
+                    return `${item.relation === '>=' ? 'الفائض' : 'الراكد'} s${index + 1}=${amount.toFixed(2)}`;
+                });
+                summary += amounts.join('؛ ') + '. ';
+            }
+        } else if (mode === 'optimal' || mode === 'minimization') {
+            summary += 'لم يتم العثور على زاوية ممكنة لحساب الحل الأمثل. ';
+        }
+        const notes = {
+            constraints: 'يُعرض كل قيد على حدة؛ أضيفي أو احذفي قيودًا حسب المسألة.',
+            feasible: 'المنطقة المظللة هي تقاطع القيود مع x1 وx2 غير السالبين.',
+            objective: 'خطوط دالة الهدف تمثل مستويات مختلفة للقيمة Z.',
+            minimization: 'رسم التدنية: غيّري اتجاه الهدف إلى «تقليل» لرؤية أقل قيمة عند الزوايا الممكنة.',
+            multiple: 'لإظهار مثال الحلول المتعددة اجعلي دالة الهدف موازية لأحد القيود.',
+            infeasible: 'مثال المسألة غير الممكنة يحتاج قيودًا متعارضة؛ إن ظلت المنطقة موجودة فالمدخلات ليست متعارضة.',
+            unbounded: 'المنطقة المظللة مقصوصة بحدود نافذة الرسم فقط؛ قد تمتد خارجها في المسألة غير المحدودة.',
+            optimality: 'تُعرض خطوط الهدف وميلان حدّيان من أول قيدين لتوضيح دوران دالة الهدف.',
+            rhs: 'الخط المتقطع هو القيد قبل تغيير RHS، والخط المتصل بعد إزاحته موازيًا.'
+        };
+        if (mode === 'rhs') summary += `تم تغيير الطرف الأيمن للقيد ${selectedRhsIndex + 1} بمقدار ${number('rhs-delta')}. `;
+        if (mode === 'infeasible' && !polygon.length) summary += 'لا يوجد تقاطع مشترك: النموذج غير ممكن. ';
+        if (mode === 'unbounded') summary += 'النافذة لا تثبت وحدها أن الحل غير محدود؛ راجعي اتجاه القيود ودالة الهدف. ';
+        if (mode === 'multiple' && !constraints.some(item => Math.abs(c1 * item.b - c2 * item.a) < 1e-7)) summary += 'لا يوجد قيد موازٍ لميل الهدف الحالي؛ عدّلي معاملات الهدف لإظهار حالة الحلول المتعددة. ';
+        byId('lp-results').textContent = summary + (notes[mode] || '');
+    }
+
+    byId('be-mode').addEventListener('change', updateBreakEvenControls);
+    byId('be-draw').addEventListener('click', drawBreakEven);
+    byId('lp-draw').addEventListener('click', drawLP);
+    addConstraint(1, 2, 40, '<=');
+    addConstraint(4, 3, 120, '<=');
+    updateBreakEvenControls();
+    drawBreakEven();
+</script>
+
+</body>
+</html>
